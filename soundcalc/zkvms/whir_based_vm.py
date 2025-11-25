@@ -48,7 +48,6 @@ class WHIRBasedVMConfig:
 
     # how many functions do we test in one go
     # TODO (BW): need to check how batching is done in WHIR
-    # This is not written in the WHIR paper IIUC, but here it is done:
     # https://github.com/WizardOfMenlo/stir-whir-scripts/blob/main/src/whir.rs#L144
     # batch_size: int
 
@@ -58,9 +57,9 @@ class WHIRBasedVMConfig:
     constraint_degree: int
 
     # TODO (BW): grinding?
-    # TODO: number of queries (different for each round)
 
     # the number of queries for each round (length M)
+    # this is t_0, ... , t_{M-1} from the WHIR paper
     num_queries: list[int]
 
     # the number of OOD samples for each round (length M-1)
@@ -216,7 +215,7 @@ class WHIRBasedVM(zkVM):
             levels[f"fold(i={iteration},s={round})"] = get_bits_of_security_from_error(epsilon)
 
         # for each iteration i = 1, ... M - 1: OOD errors, shift errors, fold errors
-        for iteration in range(1, self.num_iterations + 1):
+        for iteration in range(1, self.num_iterations):
             # out of domain samples
             epsilon_ood = self.epsilon_out(iteration, regime)
             levels[f"OOD(i={iteration})"] = get_bits_of_security_from_error(epsilon_ood)
@@ -242,17 +241,89 @@ class WHIRBasedVM(zkVM):
         """
         Returns the code for the given iteration and round. That is, this returns a pair (rate, dimension)
         of the code C_{RS}^{i,s} (in notation of Theorem 5.2 in WHIR paper).
-        Here, i <= M-1 is the iteration and s <= k is the round.
+        Here, 0<= i <= M-1 is the iteration and 0 <= s <= k is the round.
         """
-        # TODO: implement correctly
-        return (0.5, 20)
+
+
+        assert iteration <= self.num_iterations - 1 and iteration >= 0
+        assert round <= self.folding_factor and round >= 0
+
+        # The code is C_{RS}^{i,s} = RS[F, L_i^{(2^s)}, m_i - s]
+        # So the dimension is 2^{m_i - s}
+        log_dimension = self.log_degrees[iteration] - round
+        dimension = 2 ** log_dimension
+
+        # We know what the rate of C_{RS}^{i,0} = RS[F, L_i, m_i] is.
+        # Namely, it is 2**(-self.log_inv_rates[i]).
+        # The rate of C_{RS}^{i,s} is:
+        # 2^{m_i-s} / |L_i^{(2^s)}| =(2^{m_i} / |L_i|) * (2^{-s}/2^{-s}) = 2^{m_i} / |L_i|.
+        # So this code has the same rate.
+        rate = 2**(-self.log_inv_rates[iteration])
+        return (rate, dimension)
+
+    def get_delta_for_iteration(self, iteration: int, regime: ProximityGapsRegime) -> float:
+        """
+        Returns delta_i, in the notation of the paper, where i = iteration.
+
+        This is determined so that it is small enough for the proximity gaps regime on
+        all codes C_{RS}^{i,s}, s <= k.
+        """
+
+        # we iterate over all codes, i.e., over all rounds s
+        # and for each code, we determine the max delta that is supported,
+        # and then take the smallest of them, so that the condition is satisfied.
+
+        delta = 1.0
+
+        for round in range(1, self.folding_factor + 1):
+            (rate, dimension) = self.get_code_for_iteration_and_round(iteration, round)
+            delta_round = regime.get_max_delta(rate, dimension, self.field)
+            delta = min(delta, delta_round)
+
+        return delta
+
+
+    def get_list_size_for_iteration_and_round(self, iteration: int, round: int, regime: ProximityGapsRegime) -> float:
+        """
+        Returns ell_{i,s}, so that code C_{RS}^{i,s} is (ell_{i,s},delta_i)-list decodable.
+        This uses the proximity gaps regime to determine the list size.
+
+        Here, delta_i = get_delta_for_iteration(iteration,regime), i = iteration, s = round.
+        """
+
+        assert iteration <= self.num_iterations - 1 and iteration >= 0
+        assert round <= self.folding_factor and round >= 0
+
+        # first figure out the delta for this iteration
+        delta = self.get_delta_for_iteration(iteration, regime)
+
+        # now compute the list size from it. This requires the code parameters for C_{RS}^{i,s}.
+        (rate, dimension) = self.get_code_for_iteration_and_round(iteration, round)
+        list_size = regime.get_max_list_size(rate, dimension, self.field, delta)
+
+        return list_size
 
     def epsilon_fold(self, iteration: int, round: int, regime: ProximityGapsRegime) -> float:
         """
         Returns the error of a folding round. This is epsilon^fold_{i,s} in the notation
         of the paper (Theorem 5.2 in WHIR paper), where i is the iteration and s <= k is the round.
         """
-        return 1 # TODO.
+
+        # the error has two terms
+        epsilon = 0
+
+        # first term is d * ell_{i,s-1} / F
+        list_size = self.get_list_size_for_iteration_and_round(iteration, round - 1, regime)
+        epsilon += self.constraint_degree * list_size / self.field.F
+
+        # second term is the proximity gaps error err(C_{RS}^{i,s}, 2, delta_i)
+        # the WHIR theorem assumes that powers is a prox generator,
+        # so we use the error for powers here.
+        num_functions = 2
+        (rate, dimension) = self.get_code_for_iteration_and_round(iteration, round)
+        epsilon += regime.get_error_powers(rate, dimension, self.field, num_functions)
+
+        return epsilon
 
     def epsilon_out(self, iteration: int, regime: ProximityGapsRegime) -> float:
         """
@@ -261,16 +332,42 @@ class WHIRBasedVM(zkVM):
         Follows https://github.com/WizardOfMenlo/stir-whir-scripts/blob/main/src/errors.rs#L146, as WHIR paper
         does not cover the case of having more than one OOD sample.
         """
-        return 1 # TODO
+
+        # term is ell_{i,0}^2 * 2^{m_i} / (2F) for one OOD sample.
+        # for w many OOD samples, the 2^{m_i} / (2F) part is raised to the power w
+        list_size = self.get_list_size_for_iteration_and_round(iteration, 0, regime)
+        mi = self.log_degrees[iteration]
+        w = self.num_ood_samples[iteration - 1]
+        epsilon = list_size * list_size * ((2**mi) / (2 * self.field.F)) ** w
+
+        return epsilon
 
     def epsilon_shift(self, iteration: int, regime: ProximityGapsRegime) -> float:
         """
         Returns the error epsilon^shift_i from the paper (Theorem 5.2 in WHIR paper), where i is the iteration.
         """
-        return 1 # TODO
+
+        assert iteration <= self.num_iterations - 1 and iteration >= 1
+
+        # the error has two terms, both depend on number of queries t_{M-1}
+        epsilon = 0
+        t = self.num_queries[iteration - 1]
+
+        # first term is (1-delta_{M-1})^{t_{M-1}}
+        delta = self.get_delta_for_iteration(iteration - 1, regime)
+        epsilon += (1.0 - delta) ** t
+
+        # second term is ell_{i,0} * (t_{i-1}+1)/F
+        list_size = self.get_list_size_for_iteration_and_round(iteration, 0, regime)
+        epsilon += list_size * (t + 1) / self.field.F
+
+        return epsilon
 
     def epsilon_fin(self, regime: ProximityGapsRegime) -> float:
         """
         Returns the error epsilon^fin from the paper (Theorem 5.2 in WHIR paper).
         """
-        return 1 # TODO
+
+        # the error is (1-delta_{M-1})^{t_{M-1}}
+        delta = self.get_delta_for_iteration(self.num_iterations - 1, regime)
+        return (1.0 - delta) ** self.num_queries[self.num_iterations - 1]
