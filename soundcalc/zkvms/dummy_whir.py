@@ -26,6 +26,12 @@ class DummyWHIRPreset:
         num_queries = [80,35,22,12,9]
         num_ood_samples = [2,2,2,2]
 
+        # grinding
+        grinding_bits_batching = 10
+        grinding_bits_folding = [[10,10,10,10], [10,10,10,10], [10,10,10,10], [10,10,10,10], [10,10,10,10]]
+        grinding_bits_queries = [0,0,0,12,20]
+        grinding_bits_ood = [0,0,0,0]
+
 
         cfg = WHIRBasedVMConfig(
             name=name,
@@ -37,8 +43,12 @@ class DummyWHIRPreset:
             log_degree=log_degree,
             batch_size=batch_size,
             power_batching=power_batching,
+            grinding_bits_batching=grinding_bits_batching,
+            grinding_bits_folding=grinding_bits_folding,
             constraint_degree=constraint_degree,
             num_queries=num_queries,
-            num_ood_samples=num_ood_samples
+            grinding_bits_queries=grinding_bits_queries,
+            num_ood_samples=num_ood_samples,
+            grinding_bits_ood=grinding_bits_ood
         )
         return WHIRBasedVM(cfg)

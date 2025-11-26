@@ -8,6 +8,7 @@ from soundcalc.proxgaps.proxgaps_regime import ProximityGapsRegime
 from soundcalc.proxgaps.unique_decoding import UniqueDecodingRegime
 from soundcalc.zkvms.zkvm import zkVM
 from typing import Tuple
+import math
 
 @dataclass(frozen=True)
 class WHIRBasedVMConfig:
@@ -56,19 +57,32 @@ class WHIRBasedVMConfig:
     # 1, r_1, r_2, ... r_{num_polys - 1} (power_batching = False)
     power_batching: bool
 
+    # Number of bits of grinding for the batching round
+    grinding_bits_batching: int
+
     # degree of constraints being proven on the committed words
     # This is d in Construction 5.1 in WHIR. Note that d = max{d*,3},
     # and d* =  1 + deg_Z(hat{w}0) + max_i deg_Xi(hat{w}0)
     constraint_degree: int
 
-    # TODO (BW): grinding?
+    # number of bits of grinding for reducing the folding errors (length M x k)
+    # this impacts epsilon^fold_{i,s}, 0 <= i <= M-1, 0 <= s <= k
+    grinding_bits_folding: list[list[int]]
 
     # the number of queries for each round (length M)
     # this is t_0, ... , t_{M-1} from the WHIR paper
     num_queries: list[int]
 
+    # number of bits of grinding for the query rounds (length M)
+    # this changes the errors eps_shift and eps_fin
+    grinding_bits_queries: list[int]
+
     # the number of OOD samples for each round (length M-1)
     num_ood_samples: list[int]
+
+    # number of bits of grinding for each OOD round (length M-1)
+    grinding_bits_ood: list[int]
+
 
 
 
@@ -82,15 +96,20 @@ class WHIRBasedVM(zkVM):
         """
         self.name = config.name
 
+        # inherit parameters from the given config
         self.hash_size_bits = config.hash_size_bits
         self.folding_factor = config.folding_factor
         self.num_iterations = config.num_iterations
         self.field = config.field
-        self.constraint_degree = config.constraint_degree
-        self.num_queries = config.num_queries
-        self.num_ood_samples = config.num_ood_samples
         self.batch_size = config.batch_size
         self.power_batching = config.power_batching
+        self.grinding_bits_batching = config.grinding_bits_batching
+        self.constraint_degree = config.constraint_degree
+        self.grinding_bits_folding = config.grinding_bits_folding
+        self.num_queries = config.num_queries
+        self.grinding_bits_queries = config.grinding_bits_queries
+        self.num_ood_samples = config.num_ood_samples
+        self.grinding_bits_ood = config.grinding_bits_ood
 
         # determine all rates (in contrast to FRI, these change over the iterations)
         # this also involves determining all log degrees
@@ -109,6 +128,15 @@ class WHIRBasedVM(zkVM):
         assert(len(self.log_inv_rates)   == self.num_iterations + 1)
         assert(len(self.num_queries)     == self.num_iterations)
 
+        # ensure that grinding parameters have correct length
+        assert(len(self.grinding_bits_ood)     == self.num_iterations - 1)
+        assert(len(self.grinding_bits_queries) == self.num_iterations)
+        assert(len(self.grinding_bits_folding) == self.num_iterations)
+        for grinding_bits_folding_for_iteration in self.grinding_bits_folding:
+            assert(len(grinding_bits_folding_for_iteration) == self.folding_factor)
+
+        # determine the total grinding overhead (sum of 2^grinding_bits)
+        self.log_grinding_overhead = self.get_log_grinding_overhead()
 
     def get_name(self) -> str:
         return self.name
@@ -124,6 +152,8 @@ class WHIRBasedVM(zkVM):
             "hash_size_bits": self.hash_size_bits,
             "folding_factor": self.folding_factor,
             "batch_size": self.batch_size,
+            "power_batching": self.power_batching,
+            "grinding_bits_batching": self.grinding_bits_batching,
             "num_iterations": self.num_iterations,
             "constraint_degree": self.constraint_degree,
             "field": self.field.to_string(),
@@ -136,10 +166,16 @@ class WHIRBasedVM(zkVM):
 
         lines.append("")
         lines.append("  Per-round parameters:")
-        lines.append(f"    log_degrees     : {self.log_degrees}")
-        lines.append(f"    log_inv_rates   : {self.log_inv_rates}")
-        lines.append(f"    num_queries     : {self.num_queries}")
-        lines.append(f"    num_ood_samples : {self.num_ood_samples}")
+        lines.append(f"    log_degrees           : {self.log_degrees}")
+        lines.append(f"    log_inv_rates         : {self.log_inv_rates}")
+        lines.append(f"    num_queries           : {self.num_queries}")
+        lines.append(f"    grinding_bits_queries : {self.grinding_bits_queries}")
+        lines.append(f"    num_ood_samples       : {self.num_ood_samples}")
+        lines.append(f"    grinding_bits_ood     : {self.grinding_bits_ood}")
+        lines.append(f"    grinding_bits_folding : {self.grinding_bits_folding}")
+        lines.append("")
+        lines.append(f"  Total grinding overhead (sum of 2^grinding_bits) = 2^({self.log_grinding_overhead})")
+
 
         lines.append("```")
         return "\n".join(lines)
@@ -325,9 +361,13 @@ class WHIRBasedVM(zkVM):
         rate = 2 ** (-self.log_inv_rates[0])
         dimension = 2 ** self.log_degrees[0]
 
+        epsilon = regime.get_error_linear(rate, dimension, self.field, self.batch_size)
         if self.power_batching:
-            return regime.get_error_powers(rate, dimension, self.field, self.batch_size)
-        return regime.get_error_linear(rate, dimension, self.field, self.batch_size)
+            epsilon = regime.get_error_powers(rate, dimension, self.field, self.batch_size)
+
+        # grinding
+        epsilon *= 2 ** (-self.grinding_bits_batching)
+        return epsilon
 
     def epsilon_fold(self, iteration: int, round: int, regime: ProximityGapsRegime) -> float:
         """
@@ -349,6 +389,9 @@ class WHIRBasedVM(zkVM):
         (rate, dimension) = self.get_code_for_iteration_and_round(iteration, round)
         epsilon += regime.get_error_powers(rate, dimension, self.field, num_functions)
 
+        # grinding
+        epsilon *= 2 ** (-self.grinding_bits_folding[iteration][round - 1])
+
         return epsilon
 
     def epsilon_out(self, iteration: int, regime: ProximityGapsRegime) -> float:
@@ -365,6 +408,9 @@ class WHIRBasedVM(zkVM):
         mi = self.log_degrees[iteration]
         w = self.num_ood_samples[iteration - 1]
         epsilon = list_size * list_size * ((2**mi) / (2 * self.field.F)) ** w
+
+        # grinding
+        epsilon *= 2 ** (-self.grinding_bits_ood[iteration - 1])
 
         return epsilon
 
@@ -387,6 +433,9 @@ class WHIRBasedVM(zkVM):
         list_size = self.get_list_size_for_iteration_and_round(iteration, 0, regime)
         epsilon += list_size * (t + 1) / self.field.F
 
+        # grinding
+        epsilon *= 2 ** (-self.grinding_bits_queries[iteration - 1])
+
         return epsilon
 
     def epsilon_fin(self, regime: ProximityGapsRegime) -> float:
@@ -396,4 +445,26 @@ class WHIRBasedVM(zkVM):
 
         # the error is (1-delta_{M-1})^{t_{M-1}}
         delta = self.get_delta_for_iteration(self.num_iterations - 1, regime)
-        return (1.0 - delta) ** self.num_queries[self.num_iterations - 1]
+        epsilon = (1.0 - delta) ** self.num_queries[self.num_iterations - 1]
+
+        # grinding
+        epsilon *= 2 ** (-self.grinding_bits_queries[-1])
+        return epsilon
+
+    def get_log_grinding_overhead(self) -> float:
+        """
+        Determine the total grinding overhead, which is the sum of all individual grinding overheads.
+        The grinding overhead for c bits of grinding is 2^c.
+        """
+        grinding_sum = 0
+
+        # grinding for batching, queries, OOD
+        grinding_sum += 2 ** self.grinding_bits_batching
+        grinding_sum += sum([2 ** g for g in self.grinding_bits_queries])
+        grinding_sum += sum([2 ** g for g in self.grinding_bits_ood])
+
+        # grinding for folding
+        for iteration_g in self.grinding_bits_folding:
+            grinding_sum += sum([2 ** g for g in iteration_g])
+
+        return round(math.log2(grinding_sum), 2)
