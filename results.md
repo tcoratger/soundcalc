@@ -32,7 +32,7 @@ How to read this report:
 | regime | total | ALI | DEEP | batching | commit round 1 | commit round 2 | commit round 3 | commit round 4 | commit round 5 | query phase |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | UDR | 53 | 185 | 167 | 162 | 166 | 170 | 174 | 178 | 182 | 53 |
-| JBR | 58 | 180 | 162 | 110 | 118 | 126 | 134 | 142 | 150 | 58 |
+| JBR | 58 | 180 | 162 | 141 | 145 | 149 | 153 | 157 | 161 | 58 |
 | best attack | 128 | — | — | — | — | — | — | — | — | — |
 
 ## Miden
@@ -54,7 +54,7 @@ How to read this report:
 | regime | total | ALI | DEEP | batching | commit round 1 | commit round 2 | commit round 3 | commit round 4 | commit round 5 | commit round 6 | commit round 7 | query phase |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | UDR | 38 | 121 | 106 | 100 | 102 | 104 | 106 | 108 | 110 | 112 | 114 | 38 |
-| JBR | 46 | 114 | 99 | 46 | 50 | 54 | 58 | 62 | 66 | 70 | 74 | 55 |
+| JBR | 55 | 114 | 99 | 75 | 77 | 79 | 81 | 83 | 85 | 87 | 89 | 55 |
 | best attack | 96 | — | — | — | — | — | — | — | — | — | — | — |
 
 ## RISC0
@@ -76,7 +76,7 @@ How to read this report:
 | regime | total | ALI | DEEP | batching | commit round 1 | commit round 2 | commit round 3 | commit round 4 | query phase |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | UDR | 33 | 115 | 100 | 92 | 96 | 100 | 104 | 108 | 33 |
-| JBR | 38 | 109 | 94 | 38 | 46 | 54 | 62 | 70 | 47 |
+| JBR | 47 | 109 | 94 | 69 | 73 | 77 | 81 | 85 | 47 |
 | best attack | 99 | — | — | — | — | — | — | — | — |
 
 ## DummyWHIR
@@ -99,4 +99,4 @@ How to read this report:
 | regime | total | OOD(i=1) | OOD(i=2) | OOD(i=3) | OOD(i=4) | Shift(i=1) | Shift(i=2) | Shift(i=3) | Shift(i=4) | batching | fin | fold(i=0,s=1) | fold(i=0,s=2) | fold(i=0,s=3) | fold(i=0,s=4) | fold(i=1,s=1) | fold(i=1,s=2) | fold(i=1,s=3) | fold(i=1,s=4) | fold(i=2,s=1) | fold(i=2,s=2) | fold(i=2,s=3) | fold(i=2,s=4) | fold(i=3,s=1) | fold(i=3,s=2) | fold(i=3,s=3) | fold(i=3,s=4) | fold(i=4,s=1) | fold(i=4,s=2) | fold(i=4,s=3) | fold(i=4,s=4) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | UDR | 21 | 219 | 227 | 235 | 243 | 33 | 31 | 21 | 23 | 107 | 28 | 113 | 114 | 115 | 116 | 114 | 115 | 116 | 117 | 115 | 116 | 117 | 118 | 116 | 117 | 118 | 119 | 117 | 118 | 119 | 120 |
-| JBR | 36 | 203 | 205 | 207 | 209 | 36 | 68 | 76 | 71 | 53 | 78 | 62 | 64 | 66 | 68 | 59 | 61 | 63 | 65 | 57 | 59 | 61 | 63 | 54 | 56 | 58 | 60 | 52 | 54 | 56 | 58 |
+| JBR | 36 | 203 | 205 | 207 | 209 | 36 | 68 | 76 | 71 | 85 | 78 | 93 | 94 | 95 | 96 | 89 | 90 | 91 | 92 | 86 | 87 | 88 | 89 | 82 | 83 | 84 | 85 | 79 | 80 | 81 | 82 |

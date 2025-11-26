@@ -49,12 +49,12 @@ class JohnsonBoundRegime(ProximityGapsRegime):
     def get_error_linear(self, rate: float, dimension: int, field: FieldParams, num_functions: int) -> float:
 
         # following WHIR bound in Conjecture 4.12, and noting that 1 - √ρ - delta = η
-        exponent = 7 # TODO: in new results, this is probably just 5
+        exponent = 5
         sqrt_rate_div_20 = math.sqrt(rate) / 20
         eta = self.get_eta(rate)
         denominator = (2 * min(eta, sqrt_rate_div_20)) ** exponent
         denominator *= field.F
 
-        numerator = dimension * dimension # TODO: in new results, this is probably just dimension
+        numerator = dimension
 
         return numerator / denominator
