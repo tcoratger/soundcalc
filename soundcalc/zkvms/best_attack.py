@@ -5,6 +5,7 @@ from ..common.utils import get_bits_of_security_from_error
 
 from dataclasses import dataclass
 
+#TODO: remove that class at some point. It is ugly.
 @dataclass(frozen=True)
 class FRIParameters:
     """

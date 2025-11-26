@@ -70,8 +70,8 @@ class FRIBasedVMConfig:
     # This can be greater than `num_columns`: some zkEVMs have to use "segment polynomials" (aka "composition polynomials")
     batch_size: int
     # Boolean flag to indicate if batched-FRI is implemented using coefficients
-    # r^0, r^1, ... r^{num_polys-1} (power_batching = True) or
-    # 1, r_1, r_2, ... r_{num_polys - 1} (power_batching = False)
+    # r^0, r^1, ... r^{batch_size-1} (power_batching = True) or
+    # 1, r_1, r_2, ... r_{batch_size - 1} (power_batching = False)
     power_batching: bool
     # Number of FRI queries
     num_queries: int
@@ -105,7 +105,7 @@ class FRIBasedVM(zkVM):
         self.rho = config.rho
         self.trace_length = config.trace_length
         self.num_columns = config.num_columns
-        self.num_polys = config.batch_size
+        self.batch_size = config.batch_size
         self.power_batching = config.power_batching
         self.num_queries = config.num_queries
         self.max_combo = config.max_combo
@@ -115,7 +115,7 @@ class FRIBasedVM(zkVM):
         self.AIR_max_degree = config.AIR_max_degree
 
         # Number of columns should be less or equal to the final number of polynomials in batched-FRI
-        assert self.num_columns <= self.num_polys
+        assert self.num_columns <= self.batch_size
 
         # Now, also compute some auxiliary parameters
 
@@ -169,7 +169,7 @@ class FRIBasedVM(zkVM):
             "h = log2(trace_length)": self.h,
             "domain_size D = trace_length / rho": self.D,
             "num_columns": self.num_columns,
-            "num_polys": self.num_polys,
+            "batch_size": self.batch_size,
             "power_batching": self.power_batching,
             "num_queries": self.num_queries,
             "max_combo": self.max_combo,
@@ -205,7 +205,7 @@ class FRIBasedVM(zkVM):
         return get_FRI_proof_size_bits(
             hash_size_bits=self.hash_size_bits,
             field_size_bits=field_element_size_bits(self.field),
-            num_functions=self.num_polys,
+            num_functions=self.batch_size,
             num_queries=self.num_queries,
             witness_size=int(self.D),
             field_extension_degree=int(self.field_extension_degree),
@@ -246,7 +246,7 @@ class FRIBasedVM(zkVM):
             hash_size_bits=self.hash_size_bits,
             field_size_bits=field_element_size_bits(self.field),
             rho=self.rho,
-            num_functions=self.num_polys,
+            num_functions=self.batch_size,
             num_queries=self.num_queries,
             witness_size=int(self.D),
             D=self.D,
@@ -264,45 +264,10 @@ class FRIBasedVM(zkVM):
 
         return result
 
-
-
-        #result = {}
-        #for regime in regimes:
-        #    id = regime.identifier()
-
-        #    # errors consist of FRI errors and proof system errors
-        #    fri_levels = regime.get_rbr_levels(fri_parameters)
-        #    list_size = regime.get_bound_on_list_size(fri_parameters)
-        #
-
-
-
-        # return result
-
     def get_security_levels_for_regime(self, regime: ProximityGapsRegime) -> dict[str, int]:
         """
         Same as get_security_levels, but for a specific regime.
         """
-
-        # TODO: remove that struct, it is ugly and redundant
-        params = FRIParameters(
-            hash_size_bits=self.hash_size_bits,
-            field_size_bits=field_element_size_bits(self.field),
-            rho=self.rho,
-            num_functions=self.num_polys,
-            num_queries=self.num_queries,
-            witness_size=int(self.D),
-            D=self.D,
-            F=self.F,
-            FRI_rounds_n=self.FRI_rounds_n,
-            power_batching=self.power_batching,
-            field_extension_degree=int(self.field_extension_degree),
-            early_stop_degree=int(self.FRI_early_stop_degree),
-            folding_factor=int(self.FRI_folding_factor),
-            grinding_query_phase=self.grinding_query_phase,
-            trace_length=self.trace_length,
-            max_combo=self.max_combo
-        )
 
         bits = {}
 
@@ -310,9 +275,9 @@ class FRIBasedVM(zkVM):
         bits["batching"] = get_bits_of_security_from_error(self.get_batching_error(regime))
 
         # Compute FRI error for folding / commit phase
-        FRI_rounds = params.FRI_rounds_n
+        FRI_rounds = self.FRI_rounds_n
         for i in range(FRI_rounds):
-            bits[f"commit round {i+1}"] = get_bits_of_security_from_error(self.get_commit_phase_error(regime))
+            bits[f"commit round {i+1}"] = get_bits_of_security_from_error(self.get_commit_phase_error(i, regime))
 
         # Compute FRI error for query phase
         bits["query phase"] = get_bits_of_security_from_error(self.get_query_phase_error(regime))
@@ -320,10 +285,45 @@ class FRIBasedVM(zkVM):
         return bits
 
     def get_batching_error(self, regime: ProximityGapsRegime) -> float:
-        return 1 #TODO
+        """
+        Returns the error due to the batching step. This depends on whether batching is done
+        with powers or with random coefficients.
+        """
 
-    def get_commit_phase_error(self, regime: ProximityGapsRegime) -> float:
-        return 1 #TODO
+        rate = self.rho
+        dimension = self.trace_length
+
+        epsilon = regime.get_error_linear(rate, dimension, self.field, self.batch_size)
+        if self.power_batching:
+            epsilon = regime.get_error_powers(rate, dimension, self.field, self.batch_size)
+
+        return epsilon
+
+    def get_commit_phase_error(self, round: int, regime: ProximityGapsRegime) -> float:
+        """
+        Returns the error from a round of the commit phase.
+        """
+
+        rate = self.rho
+        dimension = self.trace_length / (self.FRI_folding_factor ** (round + 1)) #TODO: check if it is round or round+1
+
+        epsilon = regime.get_error_powers(rate, dimension, self.field, self.batch_size)
+
+        return epsilon
 
     def get_query_phase_error(self, regime: ProximityGapsRegime) -> float:
-        return 1 #TODO
+        """
+        Returns the error from the FRI query phase, including grinding.
+        """
+
+        rate = self.rho
+        dimension = self.trace_length
+
+        # error is (1-delta)^number of queries
+        delta = regime.get_max_delta(rate, dimension, self.field)
+        epsilon = (1 - delta) ** self.num_queries
+
+        # add grinding
+        epsilon *= 2 ** (-self.grinding_query_phase)
+
+        return epsilon

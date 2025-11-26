@@ -31,8 +31,8 @@ How to read this report:
 
 | regime | total | ALI | DEEP | batching | commit round 1 | commit round 2 | commit round 3 | commit round 4 | commit round 5 | query phase |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| UDR | 0 | 185 | 167 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| JBR | 0 | 180 | 162 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| UDR | 53 | 185 | 167 | 162 | 166 | 170 | 174 | 178 | 182 | 53 |
+| JBR | 58 | 180 | 162 | 110 | 118 | 126 | 134 | 142 | 150 | 58 |
 | best attack | 128 | — | — | — | — | — | — | — | — | — |
 
 ## Miden
@@ -53,8 +53,8 @@ How to read this report:
 
 | regime | total | ALI | DEEP | batching | commit round 1 | commit round 2 | commit round 3 | commit round 4 | commit round 5 | commit round 6 | commit round 7 | query phase |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| UDR | 0 | 121 | 106 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| JBR | 0 | 114 | 99 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| UDR | 38 | 121 | 106 | 100 | 102 | 104 | 106 | 108 | 110 | 112 | 114 | 38 |
+| JBR | 46 | 114 | 99 | 46 | 50 | 54 | 58 | 62 | 66 | 70 | 74 | 55 |
 | best attack | 96 | — | — | — | — | — | — | — | — | — | — | — |
 
 ## RISC0
@@ -75,8 +75,8 @@ How to read this report:
 
 | regime | total | ALI | DEEP | batching | commit round 1 | commit round 2 | commit round 3 | commit round 4 | query phase |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| UDR | 0 | 115 | 100 | 0 | 0 | 0 | 0 | 0 | 0 |
-| JBR | 0 | 109 | 94 | 0 | 0 | 0 | 0 | 0 | 0 |
+| UDR | 33 | 115 | 100 | 92 | 96 | 100 | 104 | 108 | 33 |
+| JBR | 38 | 109 | 94 | 38 | 46 | 54 | 62 | 70 | 47 |
 | best attack | 99 | — | — | — | — | — | — | — | — |
 
 ## DummyWHIR
