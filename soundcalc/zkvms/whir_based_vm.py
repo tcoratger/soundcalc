@@ -13,7 +13,7 @@ import math
 @dataclass(frozen=True)
 class WHIRBasedVMConfig:
     """
-    A configuration of a FRI-based zkVM
+    A configuration of a WHIR-based zkVM
     """
 
     # Name of the proof system
