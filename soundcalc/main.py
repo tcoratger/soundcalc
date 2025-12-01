@@ -75,8 +75,7 @@ def print_summary_for_zkvm(zkvm: zkVM) -> None:
     print("")
     print("")
 
-
-def main() -> None:
+def main(print_only: list[str] | None = None) -> None:
     """
     Main entry point for soundcalc
 
@@ -85,12 +84,18 @@ def main() -> None:
     """
 
     # We consider the following zkVMs
-    zkvms = [
+    all_zkvms = [
         ZiskPreset.default(),
         MidenPreset.default(),
         Risc0Preset.default(),
         DummyWHIRPreset.default(),
     ]
+
+    if print_only:
+        filter_names = [p.lower() for p in print_only]
+        zkvms = [z for z in all_zkvms if z.get_name().lower() in filter_names]
+    else:
+        zkvms = all_zkvms
 
     # Print summary for each zkVM
     for zkvm in zkvms:
