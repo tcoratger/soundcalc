@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Protocol, Mapping, Any
 
 from math import log2
+import toml
 
 from soundcalc.common.utils import get_bits_of_security_from_error
 from soundcalc.proxgaps.johnson_bound import JohnsonBoundRegime
@@ -11,7 +13,7 @@ from soundcalc.proxgaps.proxgaps_regime import ProximityGapsRegime
 from soundcalc.proxgaps.unique_decoding import UniqueDecodingRegime
 from soundcalc.zkvms.best_attack import get_best_attack_security
 from soundcalc.zkvms.zkvm import Circuit, zkVM
-from ..common.fields import FieldParams, field_element_size_bits
+from ..common.fields import FieldParams, field_element_size_bits, parse_field
 from ..common.fri import get_FRI_proof_size_bits, get_num_FRI_folding_rounds
 
 
@@ -330,6 +332,38 @@ class FRIBasedVM(zkVM):
     def __init__(self, name: str, circuits: list[FRIBasedCircuit]):
         self._name = name
         self._circuits = circuits
+
+    @classmethod
+    def load_from_toml(cls, toml_path: Path) -> "FRIBasedVM":
+        """
+        Load a FRI-based VM from a TOML configuration file.
+        """
+        with open(toml_path, "r") as f:
+            config = toml.load(f)
+
+        field = parse_field(config["zkevm"]["field"])
+        circuits = []
+
+        for section in config.get("circuits", []):
+            cfg = FRIBasedVMConfig(
+                name=section["name"],
+                hash_size_bits=config["zkevm"]["hash_size_bits"],
+                rho=section["rho"],
+                trace_length=section["trace_length"],
+                field=field,
+                num_columns=section["num_columns"],
+                batch_size=section["num_pols"],
+                power_batching=section["power_batching"],
+                num_queries=section["num_queries"],
+                AIR_max_degree=section["air_max_degree"],
+                FRI_folding_factors=section.get("fri_folding_factors"),
+                FRI_early_stop_degree=section.get("fri_early_stop_degree"),
+                max_combo=section["opening_points"],
+                grinding_query_phase=section.get("grinding_query_phase", 0),
+            )
+            circuits.append(FRIBasedCircuit(cfg))
+
+        return cls(config["zkevm"]["name"], circuits=circuits)
 
     def get_name(self) -> str:
         return self._name

@@ -70,3 +70,22 @@ def field_element_size_bits(field: FieldParams) -> int:
     Returns the size of a field element in bits.
     """
     return math.ceil(math.log2(field.p)) * field.field_extension_degree
+
+
+# Map field strings (as used in TOML configs) to FieldParams
+FIELD_MAP = {
+    "Goldilocks^2": GOLDILOCKS_2,
+    "Goldilocks^3": GOLDILOCKS_3,
+    "BabyBear^4": BABYBEAR_4,
+    "BabyBear^5": BABYBEAR_5,
+}
+
+
+def parse_field(field_str: str) -> FieldParams:
+    """
+    Parse a field string from a TOML config into a FieldParams object.
+    """
+    field = FIELD_MAP.get(field_str)
+    if field is None:
+        raise ValueError(f"Unknown field: {field_str}")
+    return field

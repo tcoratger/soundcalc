@@ -4,9 +4,7 @@ import os
 
 from soundcalc.common.utils import KIB
 from soundcalc.zkvms.dummy_whir import DummyWHIRPreset
-from soundcalc.zkvms.risc0 import Risc0Preset
-from soundcalc.zkvms.miden import MidenPreset
-from soundcalc.zkvms.zisk import ZiskPreset
+from soundcalc.zkvms import risc0, miden, zisk
 from soundcalc.report import build_zkvm_report
 from soundcalc.zkvms.zkvm import Circuit, zkVM
 
@@ -85,9 +83,9 @@ def main(print_only: list[str] | None = None) -> None:
 
     # We consider the following zkVMs
     all_zkvms = [
-        ZiskPreset.default(),
-        MidenPreset.default(),
-        Risc0Preset.default(),
+        zisk.load(),
+        miden.load(),
+        risc0.load(),
         DummyWHIRPreset.default(),
     ]
 

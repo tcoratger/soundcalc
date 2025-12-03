@@ -1,7 +1,9 @@
-
 from dataclasses import dataclass
+from pathlib import Path
 
-from soundcalc.common.fields import FieldParams, field_element_size_bits
+import toml
+
+from soundcalc.common.fields import FieldParams, field_element_size_bits, parse_field
 from soundcalc.common.utils import get_bits_of_security_from_error, get_size_of_merkle_path_bits
 from soundcalc.proxgaps.johnson_bound import JohnsonBoundRegime
 from soundcalc.proxgaps.proxgaps_regime import ProximityGapsRegime
@@ -478,6 +480,40 @@ class WHIRBasedVM(zkVM):
     def __init__(self, name: str, circuits: list[WHIRBasedCircuit]):
         self._name = name
         self._circuits = circuits
+
+    @classmethod
+    def load_from_toml(cls, toml_path: Path) -> "WHIRBasedVM":
+        """
+        Load a WHIR-based VM from a TOML configuration file.
+        """
+        with open(toml_path, "r") as f:
+            config = toml.load(f)
+
+        field = parse_field(config["zkevm"]["field"])
+        circuits = []
+
+        for section in config.get("circuits", []):
+            cfg = WHIRBasedVMConfig(
+                name=section["name"],
+                hash_size_bits=config["zkevm"]["hash_size_bits"],
+                log_inv_rate=section["log_inv_rate"],
+                num_iterations=section["num_iterations"],
+                folding_factor=section["folding_factor"],
+                field=field,
+                log_degree=section["log_degree"],
+                batch_size=section["batch_size"],
+                power_batching=section["power_batching"],
+                grinding_bits_batching=section["grinding_bits_batching"],
+                constraint_degree=section["constraint_degree"],
+                grinding_bits_folding=section["grinding_bits_folding"],
+                num_queries=section["num_queries"],
+                grinding_bits_queries=section["grinding_bits_queries"],
+                num_ood_samples=section["num_ood_samples"],
+                grinding_bits_ood=section["grinding_bits_ood"],
+            )
+            circuits.append(WHIRBasedCircuit(cfg))
+
+        return cls(config["zkevm"]["name"], circuits=circuits)
 
     def get_name(self) -> str:
         return self._name
